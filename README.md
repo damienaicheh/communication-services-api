@@ -13,3 +13,13 @@ terraform plan -out plan.out
 ```sh
 terraform apply "plan.out"
 ```
+
+## Deploy the Azure Function
+
+```sh
+dotnet restore
+```
+
+```sh
+func azure functionapp publish <functionAppName>
+```
