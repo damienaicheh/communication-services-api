@@ -1,6 +1,7 @@
 {
   "name": "Azure Functions (.NET)",
-  "dockerComposeFile": "docker-compose.yml",
+  // "dockerComposeFile": "docker-compose.yml",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:8.0-jammy",
   "service": "app",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "forwardPorts": [
@@ -14,20 +15,26 @@
   },
   "features": {
     "ghcr.io/devcontainers/features/azure-cli:1": {},
-	"ghcr.io/jlaundry/devcontainer-features/azure-functions-core-tools:1": {},
-	"ghcr.io/devcontainers/features/dotnet:2": {
-		"version": "latest"
-	},
-	"ghcr.io/devcontainers/features/git:1": {
-		"ppa": true,
-		"version": "latest"
-	}
+    "ghcr.io/jlaundry/devcontainer-features/azure-functions-core-tools:1": {},
+    // "ghcr.io/devcontainers/features/dotnet:2": {
+    //   "version": "8.0.10"
+    // },
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/terraform:latest":{ 
+      "version":"latest",
+      "tflint":"latest"
+    },
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-azuretools.vscode-azurefunctions",
-        "ms-dotnettools.csdevkit"
+        "ms-dotnettools.csdevkit",
+        "azurite.azurite",
+        "hashicorp.terraform"
       ]
     }
   }
