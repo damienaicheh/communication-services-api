@@ -39,7 +39,7 @@ namespace api
         public async Task<IActionResult> RunAsync([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req)
         {
             _logger.LogInformation("Send mail triggered ...");
-            var acsConnectionString = Environment.GetEnvironmentVariable("ACS_CONNECTION_STRING") ?? throw new ArgumentNullException("STORAGE_ACCOUNT_URL");
+            var acsConnectionString = Environment.GetEnvironmentVariable("ACS_CONNECTION_STRING") ?? throw new ArgumentNullException("ACS_CONNECTION_STRING");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             dynamic? data = JsonConvert.DeserializeObject(requestBody);
