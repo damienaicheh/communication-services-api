@@ -39,7 +39,7 @@ namespace api
         public async Task<IActionResult> RunAsync([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req)
         {
             _logger.LogInformation("Send mail triggered ...");
-            string connectionString = "endpoint=https://<your-endpoint>.api.azurecommunicationservices.com/;accesskey";
+            var acsConnectionString = Environment.GetEnvironmentVariable("ACS_CONNECTION_STRING") ?? throw new ArgumentNullException("ACS_CONNECTION_STRING");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             dynamic? data = JsonConvert.DeserializeObject(requestBody);
@@ -57,7 +57,7 @@ namespace api
             try
             {
                 _logger.LogInformation($"Sending email from {senderAddress} to {recipientAddress} with subject {subject} ...");
-                var emailClient = new EmailClient(connectionString);
+                var emailClient = new EmailClient(acsConnectionString);
 
                 EmailSendOperation emailSendOperation = emailClient.Send(
                     WaitUntil.Completed,
