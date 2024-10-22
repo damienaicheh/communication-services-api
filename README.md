@@ -6,6 +6,11 @@
 cd terraform && terraform init
 ```
 
+Set the subscription ID as an environment variable:
+```sh
+export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+```
+
 ```sh
 terraform plan -out plan.out
 ```
