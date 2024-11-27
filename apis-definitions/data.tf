@@ -10,7 +10,7 @@ data "azurerm_function_app_host_keys" "func_email" {
   resource_group_name = local.resource_group_name
 }
 
-# data "azurerm_function_app_host_keys" "func_sms" {
-#   name                = local.func_sms_name
-#   resource_group_name = local.resource_group_name
-# }
+data "azurerm_function_app_host_keys" "func_sms" {
+  name                = local.func_sms_name
+  resource_group_name = local.resource_group_name
+}
