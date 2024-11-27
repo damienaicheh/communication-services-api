@@ -5,3 +5,9 @@
     "HtmlContent": "<html><h1>Hello world via email.</h1l></html>",
     "PlainTextContent": "Hello world via email."
 }
+
+{
+    "FromNumber": "+123456789",
+    "ToNumber": "+24523456789",
+    "Message": "Test SMS",
+}

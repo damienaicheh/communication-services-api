@@ -10,7 +10,7 @@ using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using System.Net;
 
-namespace api
+namespace EmailAPI
 {
     public class RequestBodyModel
     {
@@ -42,7 +42,7 @@ namespace api
             var acsConnectionString = Environment.GetEnvironmentVariable("ACS_CONNECTION_STRING") ?? throw new ArgumentNullException("ACS_CONNECTION_STRING");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            dynamic? data = JsonConvert.DeserializeObject(requestBody);
+            var data = JsonConvert.DeserializeObject<RequestBodyModel>(requestBody);
             string? senderAddress = data?.SenderAddress;
             string? recipientAddress = data?.RecipientAddress;
             string? subject = data?.Subject;
