@@ -15,7 +15,6 @@ namespace SmsAPI
 {
     public class RequestBodyModel
     {
-        public string? FromNumber { get; set; }
         public string? ToNumber { get; set; }
         public string? Message { get; set; }
     }
@@ -42,7 +41,7 @@ namespace SmsAPI
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var data = JsonConvert.DeserializeObject<RequestBodyModel>(requestBody);
-            string? fromNumber = data?.FromNumber;
+            string? fromNumber = Environment.GetEnvironmentVariable("FROM_NUMBER") ?? throw new ArgumentNullException("FROM_NUMBER");
             string? toNumber = data?.ToNumber;
             string? message = data?.Message;
 

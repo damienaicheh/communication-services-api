@@ -109,6 +109,10 @@ resource "azapi_resource" "func_sms" {
           {
             name = "ACS_CONNECTION_STRING"
             value = azurerm_communication_service.this.primary_connection_string
+          },
+          {
+            name = "FROM_NUMBER"
+            value = "CONTOSITA"
           }
         ]
       }

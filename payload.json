@@ -7,7 +7,6 @@
 }
 
 {
-    "FromNumber": "+123456789",
     "ToNumber": "+24523456789",
     "Message": "Test SMS",
 }

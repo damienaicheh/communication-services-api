@@ -23,7 +23,7 @@ resource "azurerm_api_management_api" "sms" {
   resource_group_name = local.resource_group_name
   api_management_name = local.api_management_name
   revision            = "1"
-  display_name        = "sms"
+  display_name        = "Sms"
   path                = "sms"
   protocols           = ["https"]
 }
