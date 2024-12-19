@@ -15,6 +15,7 @@ namespace SmsAPI
 {
     public class RequestBodyModel
     {
+        public string? FromNumber { get; set; }
         public string? ToNumber { get; set; }
         public string? Message { get; set; }
     }
@@ -41,11 +42,17 @@ namespace SmsAPI
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             var data = JsonConvert.DeserializeObject<RequestBodyModel>(requestBody);
-            string? fromNumber = Environment.GetEnvironmentVariable("FROM_NUMBER") ?? throw new ArgumentNullException("FROM_NUMBER");
+
+            string? fromNumber = data?.FromNumber;
+            if (string.IsNullOrEmpty(fromNumber))
+            {
+                fromNumber = Environment.GetEnvironmentVariable("FROM_NUMBER") ?? throw new ArgumentNullException("FROM_NUMBER");
+            }
+
             string? toNumber = data?.ToNumber;
             string? message = data?.Message;
 
-            if (string.IsNullOrEmpty(fromNumber) || string.IsNullOrEmpty(toNumber) || string.IsNullOrEmpty(message))
+            if (string.IsNullOrEmpty(toNumber) || string.IsNullOrEmpty(message))
             {
                 return new BadRequestObjectResult("Please pass a proper request body");
             }

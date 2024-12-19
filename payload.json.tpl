@@ -1,3 +1,4 @@
+// Email
 {
     "SenderAddress": "*.azurecomm.net",
     "RecipientAddress": "*@domain.com",
@@ -6,7 +7,9 @@
     "PlainTextContent": "Hello world via email."
 }
 
+// SMS
 {
+    "FromNumber": "CONTOSO", // Optional
     "ToNumber": "+24523456789",
     "Message": "Test SMS",
 }
