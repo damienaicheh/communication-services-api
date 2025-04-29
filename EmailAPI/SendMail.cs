@@ -1,24 +1,58 @@
+using System.Net;
 using Azure;
 using Azure.Communication.Email;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using Azure.Data.Tables;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using Newtonsoft.Json;
-using System.Net;
 
 namespace EmailAPI
 {
     public class RequestBodyModel
     {
+        [JsonPropertyName("SenderAddress")]
         public string? SenderAddress { get; set; }
-        public string? RecipientAddress { get; set; }
+
+        [JsonPropertyName("RecipientAddress")]
+        public string? RecipientAddress { get; set; } 
+
+        [JsonPropertyName("Subject")]
         public string? Subject { get; set; }
+
+        [JsonPropertyName("HtmlContent")]
         public string? HtmlContent { get; set; }
+
+        [JsonPropertyName("PlainTextContent")]
         public string? PlainTextContent { get; set; }
+
+        [JsonPropertyName("Attachments")]
+        public List<AttachmentRequest> Attachments { get; set; } = new();
+    }
+
+    public class AttachmentRequest
+    {
+        [JsonPropertyName("base64")]
+        public string? Base64 { get; set; }
+
+        [JsonPropertyName("fileName")]
+        public string? FileName { get; set; } 
+    }
+
+    public class EmailLogEntity : ITableEntity
+    {
+        public string PartitionKey { get; set; } = "EmailLog";
+        public string RowKey { get; set; } = Guid.NewGuid().ToString();
+        public string To { get; set; } = string.Empty;
+        public string Subject { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string ErrorMessage { get; set; } = string.Empty;
+        public DateTimeOffset? Timestamp { get; set; } = DateTimeOffset.UtcNow;
+        public ETag ETag { get; set; } = ETag.All;
     }
 
     public class SendMail
@@ -36,43 +70,115 @@ namespace EmailAPI
         [OpenApiRequestBody("application/json", typeof(RequestBodyModel), Required = true,
            Description = "JSON request body containing { SenderAddress, RecipientAddress, Subject, HtmlContent, PlainTextContent }")]
         [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "text/plain", bodyType: typeof(string), Description = "The OK response")]
-        public async Task<IActionResult> RunAsync([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req)
+
+        public async Task<HttpResponseData> RunAsync(
+            [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
+            FunctionContext context)
         {
             _logger.LogInformation("Send mail triggered ...");
             var acsConnectionString = Environment.GetEnvironmentVariable("ACS_CONNECTION_STRING") ?? throw new ArgumentNullException("ACS_CONNECTION_STRING");
+            var logsStorageConnectionstring = Environment.GetEnvironmentVariable("LOGS_STORAGE_CONNECTION_STRING") ?? throw new ArgumentNullException("LOGS_STORAGE_CONNECTION_STRING");
 
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var data = JsonConvert.DeserializeObject<RequestBodyModel>(requestBody);
-            string? senderAddress = data?.SenderAddress;
-            string? recipientAddress = data?.RecipientAddress;
-            string? subject = data?.Subject;
-            string? htmlContent = data?.HtmlContent;
-            string? plainTextContent = data?.PlainTextContent;
-
-            if (string.IsNullOrEmpty(senderAddress) || string.IsNullOrEmpty(recipientAddress) || string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(htmlContent) || string.IsNullOrEmpty(plainTextContent))
-            {
-                return new BadRequestObjectResult("Please pass a proper request body");
-            }
-
+            var response = req.CreateResponse();
+            RequestBodyModel? emailRequest = null;
             try
             {
-                _logger.LogInformation($"Sending email from {senderAddress} to {recipientAddress} with subject {subject} ...");
+                var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+                _logger.LogInformation($"Raw Request Body: {requestBody}");
+                 emailRequest = JsonSerializer.Deserialize<RequestBodyModel>(requestBody) ?? new RequestBodyModel();
+
+                if (string.IsNullOrWhiteSpace(emailRequest.RecipientAddress))
+                    throw new ArgumentException("Recipient address ('to') is required.");
+
+                if (string.IsNullOrWhiteSpace(emailRequest.SenderAddress))
+                    throw new ArgumentException("Sender address ('to') is required.");
+
                 var emailClient = new EmailClient(acsConnectionString);
 
-                EmailSendOperation emailSendOperation = emailClient.Send(
-                    WaitUntil.Completed,
-                    senderAddress: senderAddress,
-                    recipientAddress: recipientAddress,
-                    subject: subject,
-                    htmlContent: htmlContent,
-                    plainTextContent: plainTextContent);
+                var recipient = new EmailAddress(emailRequest.RecipientAddress);
+                var recipients = new EmailRecipients(new List<EmailAddress> { recipient });
+
+                var content = new EmailContent(emailRequest.Subject)
+                {
+                    Html = emailRequest.HtmlContent,
+                    PlainText = string.IsNullOrWhiteSpace(emailRequest.PlainTextContent) ? emailRequest.Subject : null
+                };
+
+                var message = new EmailMessage(emailRequest.SenderAddress, recipients, content);
+
+                foreach (var att in emailRequest.Attachments)
+                {
+                    if (!string.IsNullOrWhiteSpace(att.Base64) && !string.IsNullOrWhiteSpace(att.FileName))
+                    {
+                        byte[] data = Convert.FromBase64String(att.Base64);
+                        message.Attachments.Add(new EmailAttachment(
+                            att.FileName,
+                            "application/octet-stream",
+                            new BinaryData(data)));
+                    }
+                }
+
+                var operation = await emailClient.SendAsync(Azure.WaitUntil.Completed, message);
+                var result = operation.Value;
+                if (result.Status == EmailSendStatus.Succeeded)
+                {
+                    await LogToTableStorageAsync(logsStorageConnectionstring, emailRequest, "Success", string.Empty);
+                    response.StatusCode = HttpStatusCode.OK;
+                    await response.WriteStringAsync("Email sent successfully.");
+                }
+                else
+                {
+                    throw new Exception($"Email failed with status: {result.Status}");
+                }
             }
             catch (Exception ex)
             {
-                return new BadRequestObjectResult(ex.Message);
+                _logger.LogError(ex, "Error sending email to {Recipient}", emailRequest?.RecipientAddress?? "N/A");
+
+                await LogToTableStorageAsync(
+                    logsStorageConnectionstring,
+                    new RequestBodyModel
+                    {
+                        RecipientAddress = emailRequest?.RecipientAddress ?? "N/A",
+                        Subject = emailRequest?.Subject ?? "N/A"
+                    },
+                    "Failed",
+                    ex.Message);
+
+                response.StatusCode = HttpStatusCode.InternalServerError;
+                await response.WriteStringAsync($"Failed to send email: {ex.Message}");
             }
 
-            return new OkObjectResult("Email sent successfully");
+            return response;
+        }
+
+        private async Task LogToTableStorageAsync(string connection, RequestBodyModel request, string status, string errorMsg)
+        {
+            try
+            {
+                var tableClient = new TableClient(connection, "emaillogstore");
+                await tableClient.CreateIfNotExistsAsync();
+
+                if (!string.IsNullOrWhiteSpace(request.RecipientAddress) && !string.IsNullOrWhiteSpace(request.Subject))
+                {
+                    var log = new EmailLogEntity
+                    {
+                        To = request.RecipientAddress,
+                        Subject = request.Subject,
+                        Status = status,
+                        ErrorMessage = errorMsg
+                    };
+
+                    await tableClient.AddEntityAsync(log);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to log to Table Storage for recipient: {Recipient}, subject: {Subject}",
+                    request?.RecipientAddress ?? "N/A",
+                    request?.Subject ?? "N/A");
+            }
         }
     }
 }
+
