@@ -17,8 +17,8 @@ class Program
 
         var payload = new
         {
-            SenderAddress = "DoNotReply@c3f5b32e-96f5-4f2c-b6db-dd365f25164d.azurecomm.net",         // Replace with actual sender
-            RecipientAddress = "digha@microsoft.com",                   // Replace with actual recipient
+            SenderAddress = "*.azurecomm.net",         // Replace with actual sender
+            RecipientAddress = "*@domain.com",                   // Replace with actual recipient
             Subject = "Test Email with Multiple Attachments",
             HtmlContent = "<p>This is a test email sent from local test app with multiple attachments.</p>",
             PlainTextContent = "This is a plain text fallback message.",  // Optional: can be same as subject or simple text

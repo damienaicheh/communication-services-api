@@ -1,8 +1,3 @@
-using System;
-using System.IO;
-using System.Text;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Net;
 using Azure;
 using Azure.Communication.Email;
@@ -12,7 +7,6 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.OpenApi.Models;
@@ -83,16 +77,15 @@ namespace EmailAPI
         {
             _logger.LogInformation("Send mail triggered ...");
             var acsConnectionString = Environment.GetEnvironmentVariable("ACS_CONNECTION_STRING") ?? throw new ArgumentNullException("ACS_CONNECTION_STRING");
-            var storageConnectionstring = Environment.GetEnvironmentVariable("STORAGE_CONNECTION_STRING") ?? throw new ArgumentNullException("STORAGE_CONNECTION_STRING");
             var logsStorageConnectionstring = Environment.GetEnvironmentVariable("Logs_STORAGE_CONNECTION_STRING") ?? throw new ArgumentNullException("Logs_STORAGE_CONNECTION_STRING");
 
             var response = req.CreateResponse();
-
+            RequestBodyModel? emailRequest = null;
             try
             {
                 var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 _logger.LogInformation($"Raw Request Body: {requestBody}");
-                var emailRequest = JsonSerializer.Deserialize<RequestBodyModel>(requestBody) ?? new RequestBodyModel();
+                 emailRequest = JsonSerializer.Deserialize<RequestBodyModel>(requestBody) ?? new RequestBodyModel();
 
                 if (string.IsNullOrWhiteSpace(emailRequest.RecipientAddress))
                     throw new ArgumentException("Recipient address ('to') is required.");
@@ -129,7 +122,7 @@ namespace EmailAPI
                 var result = operation.Value;
                 if (result.Status == EmailSendStatus.Succeeded)
                 {
-                    await LogToTableStorage(logsStorageConnectionstring, emailRequest, "Success", string.Empty);
+                    await LogToTableStorageAsync(logsStorageConnectionstring, emailRequest, "Success", string.Empty);
                     response.StatusCode = HttpStatusCode.OK;
                     await response.WriteStringAsync("Email sent successfully.");
                 }
@@ -140,8 +133,18 @@ namespace EmailAPI
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending email.");
-                await LogToTableStorage(logsStorageConnectionstring, new RequestBodyModel { RecipientAddress = "Unknown", Subject = "Unknown" }, "Failed", ex.Message);
+                _logger.LogError(ex, "Error sending email to {Recipient}", emailRequest?.RecipientAddress?? "N/A");
+
+                await LogToTableStorageAsync(
+                    logsStorageConnectionstring,
+                    new RequestBodyModel
+                    {
+                        RecipientAddress = emailRequest?.RecipientAddress ?? "N/A",
+                        Subject = emailRequest?.Subject ?? "N/A"
+                    },
+                    "Failed",
+                    ex.Message);
+
                 response.StatusCode = HttpStatusCode.InternalServerError;
                 await response.WriteStringAsync($"Failed to send email: {ex.Message}");
             }
@@ -149,23 +152,33 @@ namespace EmailAPI
             return response;
         }
 
-        private async Task LogToTableStorage(string connection, RequestBodyModel request, string status, string errorMsg)
+        private async Task LogToTableStorageAsync(string connection, RequestBodyModel request, string status, string errorMsg)
         {
-            var tableClient = new TableClient(connection, "Emaillogstore");
-            await tableClient.CreateIfNotExistsAsync();
-            if (!string.IsNullOrWhiteSpace(request.RecipientAddress) && !string.IsNullOrWhiteSpace(request.Subject))
+            try
             {
-                var log = new EmailLogEntity
-                {
-                    To = request.RecipientAddress,
-                    Subject = request.Subject,
-                    Status = status,
-                    ErrorMessage = errorMsg
-                };
+                var tableClient = new TableClient(connection, "emaillogstore");
+                await tableClient.CreateIfNotExistsAsync();
 
-                await tableClient.AddEntityAsync(log);
+                if (!string.IsNullOrWhiteSpace(request.RecipientAddress) && !string.IsNullOrWhiteSpace(request.Subject))
+                {
+                    var log = new EmailLogEntity
+                    {
+                        To = request.RecipientAddress,
+                        Subject = request.Subject,
+                        Status = status,
+                        ErrorMessage = errorMsg
+                    };
+
+                    await tableClient.AddEntityAsync(log);
+                }
             }
-            
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to log to Table Storage for recipient: {Recipient}, subject: {Subject}",
+                    request?.RecipientAddress ?? "N/A",
+                    request?.Subject ?? "N/A");
+            }
         }
     }
 }
+
