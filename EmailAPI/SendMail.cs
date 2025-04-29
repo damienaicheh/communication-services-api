@@ -77,7 +77,7 @@ namespace EmailAPI
         {
             _logger.LogInformation("Send mail triggered ...");
             var acsConnectionString = Environment.GetEnvironmentVariable("ACS_CONNECTION_STRING") ?? throw new ArgumentNullException("ACS_CONNECTION_STRING");
-            var logsStorageConnectionstring = Environment.GetEnvironmentVariable("LOGS_STORAGE_CONNECTION_STRING") ?? throw new ArgumentNullException("Logs_STORAGE_CONNECTION_STRING");
+            var logsStorageConnectionstring = Environment.GetEnvironmentVariable("LOGS_STORAGE_CONNECTION_STRING") ?? throw new ArgumentNullException("LOGS_STORAGE_CONNECTION_STRING");
 
             var response = req.CreateResponse();
             RequestBodyModel? emailRequest = null;
