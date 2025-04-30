@@ -36,10 +36,10 @@ namespace EmailAPI
 
     public class AttachmentRequest
     {
-        [JsonPropertyName("base64")]
+        [JsonPropertyName("Base64")]
         public string? Base64 { get; set; }
 
-        [JsonPropertyName("fileName")]
+        [JsonPropertyName("FileName")]
         public string? FileName { get; set; } 
     }
 
