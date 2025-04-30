@@ -25,8 +25,8 @@ class Program
             PlainTextContent = "This is a plain text fallback message.",  // Optional: can be same as subject or simple text
             Attachments = new List<object>
             {
-                new { base64 = base64Content1, fileName = "TextFile1.txt" },
-                new { base64 = base64Content2, fileName = "TextFile2.txt" }
+                new { Base64 = base64Content1, FileName = "TextFile1.txt" },
+                new { Base64 = base64Content2, FileName = "TextFile2.txt" }
             }
         };
 
